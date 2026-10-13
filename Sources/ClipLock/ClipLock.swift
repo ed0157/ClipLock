@@ -103,8 +103,10 @@ final class Vault {
 
     // Every save rewrites the whole file, so both the number of entries and the total size are capped.
     let maxItems = 200
-    let maxBytes = 2_000_000         // the largest single copy that is kept
-    let maxTotalBytes = 25_000_000   // all saved text together
+    let maxBytes = 10_000_000        // the largest single copy that is kept
+    let maxTotalBytes = 50_000_000   // all saved text together
+    // Search looks at this many characters of each entry, so typing stays quick however big the history is.
+    static let searchLimit = 20_000
 
     // Set when older entries were dropped to make room for a large copy, so the menu can say so.
     private(set) var lastMadeRoom: (count: Int, at: Date)?
@@ -177,7 +179,11 @@ final class Vault {
         items.removeAll { $0.text == text }
         items.insert(ClipItem(id: UUID(), text: text, date: Date()), at: 0)
         let droppedForSize = trimToLimits()
-        if droppedForSize > 0 { lastMadeRoom = (droppedForSize, Date()) }
+        if droppedForSize > 0 {
+            // A burst of large copies adds up, instead of showing only the last one.
+            let earlier = lastMadeRoom.map { Date().timeIntervalSince($0.at) < 120 ? $0.count : 0 } ?? 0
+            lastMadeRoom = (earlier + droppedForSize, Date())
+        }
         scheduleSave()
     }
 
@@ -297,7 +303,8 @@ enum SecretDetector {
 
     static func looksLikeSecret(_ text: String) -> Bool {
         // Very long text: look at the start and the end, where a pasted key usually is.
-        let sample = text.count > 20_000
+        // The size is checked in bytes: counting characters would read all of a very long text.
+        let sample = text.utf8.count > 20_000
             ? String(text.prefix(10_000)) + "\n" + String(text.suffix(10_000))
             : text
         let range = NSRange(sample.startIndex..., in: sample)
@@ -309,7 +316,9 @@ enum SecretDetector {
 
     // The first few characters followed by dots. The dot count is fixed so the length is not revealed.
     static func masked(_ text: String) -> String {
-        let head = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(5))
+        // Skips leading white space without copying the whole text.
+        let start = text.firstIndex(where: { !$0.isWhitespace }) ?? text.endIndex
+        let head = String(text[start...].prefix(5))
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")
             .replacingOccurrences(of: "\t", with: " ")
@@ -318,7 +327,11 @@ enum SecretDetector {
 
     // A single long run of mixed letters and digits with no spaces, like a generated token.
     private static func looksLikeRandomToken(_ text: String) -> Bool {
-        let s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Find the trimmed text without copying all of a long text. A token this short is under 800 bytes.
+        guard let first = text.firstIndex(where: { !$0.isWhitespace }),
+              let last = text.lastIndex(where: { !$0.isWhitespace }),
+              text.utf8.distance(from: first, to: last) <= 800 else { return false }
+        let s = String(text[first...last])
         guard s.count >= 24, s.count <= 200, !s.contains(where: { $0.isWhitespace }) else { return false }
         guard !s.contains("://"), !s.hasPrefix("/"), !s.hasPrefix("~") else { return false }  // URLs and paths
         guard s.contains(where: { $0.isLowercase }),
@@ -795,7 +808,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             return
         }
         guard let text = String(data: data, encoding: .utf8),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+              text.contains(where: { !$0.isWhitespace }) else { return }  // stops at the first visible character
         if secretMode == .skip && SecretDetector.looksLikeSecret(text) {
             lastSkippedSecretAt = Date()
             return
@@ -941,7 +954,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             // Show when an entry is cut short or has several lines, because clicking an item
             // copies all of it, not just what the menu shows.
             let isCut = preview.count > 60 || item.text.count > 200
-            let hasLineBreaks = item.text.contains(where: { $0.isNewline })
+            let hasLineBreaks = item.text.utf8.contains(where: { $0 == 10 || $0 == 13 })  // bytes, so it stays fast on long text
             let plain = String(preview.prefix(60)) + (isCut ? "…" : "") + (hasLineBreaks ? " ⏎" : "")
 
             let hidden = looksSecret && !revealing
@@ -950,7 +963,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             // that is hidden.
             rows.append(Row(
                 id: item.id, title: title,
-                searchable: hidden ? title : item.text,
+                searchable: hidden ? title : String(item.text.prefix(Vault.searchLimit)),
                 masked: hidden, plain: plain))
         }
     }
@@ -1201,6 +1214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             "⏎   the entry has several lines",
             "••••   part of a likely secret is hidden",
             "Click the search box, then type to filter the list.",
+            "Search reads the first 20,000 characters of each entry",
             "Return copies the first match",
             nil,
             "Click the eye next to a hidden entry to show or hide just that one",
@@ -1217,9 +1231,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             nil,
             "Saved text is encrypted on disk but shown here as plain text",
             nil,
-            "Limits: 200 entries, 2 MB per copy, 25 MB in all",
+            "Limits: 200 entries, 10 MB per copy, 50 MB in all",
             "When full, the oldest entries are dropped first",
-            "Copies over 2 MB are not saved, and the menu says so",
+            "Copies over 10 MB are not saved, and the menu says so",
         ]
         let help = NSMenu()
         for line in lines {

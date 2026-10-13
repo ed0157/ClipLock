@@ -45,7 +45,9 @@ Click the ClipLock icon in the menu bar to see what you copied recently, newest 
 - **Shows how full it is.** The title above the history reads, for example, `Clipboard History · 94% full (187 of 200)`. It shows whichever limit is closer, the number of entries or the total size.
 - **No network code.** The app does not talk to the internet. The source is one short file, so you can check.
 
-Text only. Limits: 200 items, 2 MB per copy and 25 MB in all. When a limit is reached the oldest items are dropped first. A copy over 2 MB is not saved, and the menu says so for a couple of minutes. A very large copy can push out several older items to stay under 25 MB, and the menu says that too. Ordinary copies are a few KB, so 200 of them use far less than 25 MB.
+Text only. Limits: 200 items, 10 MB per copy and 50 MB in all. When a limit is reached the oldest items are dropped first. A copy over 10 MB is not saved, and the menu says so for a couple of minutes. A very large copy can push out several older items to stay under 50 MB, and the menu says that too. Ordinary copies are a few KB, so 200 of them use far less than 50 MB. Search reads the first 20,000 characters of each entry, which keeps typing quick however large the history is.
+
+Measured on an Apple Silicon Mac with 16 GB: with a full 50 MB history, opening the menu and each search keystroke take under 20 ms, and a save takes about 150 ms in the background. Memory use grows with the history, roughly 50 MB plus the working copies made while saving.
 
 ## Install
 
