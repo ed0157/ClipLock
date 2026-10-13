@@ -1,0 +1,15 @@
+build/
+*.app
+*.dmg
+.DS_Store
+*.zip
+*.sha256
+*.p12
+*.cer
+*.mobileprovision
+.env
+.claude/
+.xgrep/
+*.pyc
+__pycache__/
+venv/

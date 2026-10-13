@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Pull requests from forks get a read-only token and no secrets, so a build here cannot change the
+# repository or reach anything private. This workflow only needs to read the code.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      # Actions are pinned to full commit IDs (the tag is in the comment) so a moved tag
+      # cannot change what runs here.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Build universal app
+        run: scripts/build.sh
+
+      - name: Package installer
+        run: scripts/package.sh
+
+      - name: Upload build for review
+        # Not for pull requests from forks, so outside code never produces a downloadable installer here.
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ClipLock-dev-build
+          path: |
+            build/*.dmg
+            build/*.zip
+          retention-days: 7
