@@ -1216,7 +1216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
 
     // Plain explanations, shown as greyed-out lines.
     private func makeHelpMenu() -> NSMenu {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let lines: [String?] = [
+            "ClipLock \(version ?? "unknown version")",
+            nil,
             "…   the entry is longer than the menu shows",
             "⏎   the entry has several lines",
             "••••   part of a likely secret is hidden",
