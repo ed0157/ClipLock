@@ -41,10 +41,11 @@ Click the ClipLock icon in the menu bar to see what you copied recently, newest 
 - **Launch at Login.** Turn it on from the menu so ClipLock starts when your Mac does.
 - **Built-in Help.** The *Help* submenu explains the `…` and `⏎` marks and what is and is not saved.
 - **Pause anytime.** Stop capturing without losing what is already saved.
-- **Light on the system.** It checks the clipboard about twice a second, saves in the background, and ignores copies over 200 KB.
+- **Light on the system.** It checks the clipboard about twice a second and saves in the background.
+- **Shows how full it is.** The title above the history reads, for example, `Clipboard History · 94% full (187 of 200)`. It shows whichever limit is closer, the number of entries or the total size.
 - **No network code.** The app does not talk to the internet. The source is one short file, so you can check.
 
-Text only. Up to 200 items are kept, and the oldest are dropped first.
+Text only. Limits: 200 items, 2 MB per copy and 25 MB in all. When a limit is reached the oldest items are dropped first. A copy over 2 MB is not saved, and the menu says so for a couple of minutes. A very large copy can push out several older items to stay under 25 MB, and the menu says that too. Ordinary copies are a few KB, so 200 of them use far less than 25 MB.
 
 ## Install
 
@@ -137,7 +138,7 @@ git push origin v1.0.0
 
 Only the maintainer can start a release.
 
-Every push and pull request also runs a build (`.github/workflows/ci.yml`) and attaches the installer as a downloadable artifact.
+Every push and pull request also runs a build (`.github/workflows/ci.yml`) and attaches the installer as a downloadable artifact (not for pull requests from forks).
 
 Releases are ad-hoc signed only. Notarizing them needs a paid Apple Developer account.
 

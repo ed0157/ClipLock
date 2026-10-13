@@ -101,8 +101,15 @@ final class Vault {
     // Shown in the menu when something needs the user's attention.
     private(set) var notice: String?
 
+    // Every save rewrites the whole file, so both the number of entries and the total size are capped.
     let maxItems = 200
-    let maxBytes = 200_000
+    let maxBytes = 2_000_000         // the largest single copy that is kept
+    let maxTotalBytes = 25_000_000   // all saved text together
+
+    // Set when older entries were dropped to make room for a large copy, so the menu can say so.
+    private(set) var lastMadeRoom: (count: Int, at: Date)?
+
+    var totalBytes: Int { items.reduce(0) { $0 + $1.text.utf8.count } }
 
     // Encrypting and writing the file happens here, never on the main thread.
     private let queue = DispatchQueue(label: "cliplock.save", qos: .utility)
@@ -149,6 +156,7 @@ final class Vault {
             let loaded = try JSONDecoder().decode([ClipItem].self, from: plain)
             // Apply the same limits as when saving.
             items = Array(loaded.filter { $0.text.utf8.count <= maxBytes }.prefix(maxItems))
+            trimToLimits()
         } catch {
             let stamp = "\(Int(Date().timeIntervalSince1970 * 1000))-\(UUID().uuidString.prefix(8))"
             let aside = directory.appendingPathComponent("\(Vault.setAsidePrefix)\(stamp)")
@@ -168,10 +176,23 @@ final class Vault {
         if key == nil { key = try? KeyStore.loadOrCreateKey() }
         items.removeAll { $0.text == text }
         items.insert(ClipItem(id: UUID(), text: text, date: Date()), at: 0)
-        if items.count > maxItems {
-            items.removeLast(items.count - maxItems)
-        }
+        let droppedForSize = trimToLimits()
+        if droppedForSize > 0 { lastMadeRoom = (droppedForSize, Date()) }
         scheduleSave()
+    }
+
+    // Drops the oldest entries until both limits are met. The newest entry is always kept.
+    // Returns how many were dropped because of the total size, not the number of entries.
+    @discardableResult
+    private func trimToLimits() -> Int {
+        if items.count > maxItems { items.removeLast(items.count - maxItems) }
+        var total = totalBytes
+        var droppedForSize = 0
+        while total > maxTotalBytes, items.count > 1 {
+            total -= items.removeLast().text.utf8.count
+            droppedForSize += 1
+        }
+        return droppedForSize
     }
 
     // Waits briefly so a burst of copies causes one write instead of many.
@@ -225,6 +246,7 @@ final class Vault {
         pendingSave = nil
         items.removeAll()
         notice = nil
+        lastMadeRoom = nil
         saveBlocked = false
         dirtySince = nil
         queue.sync {}  // let any write already in progress finish before deleting
@@ -583,6 +605,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
     private var ticksSinceRetry = 0
     private var opening = false
     private var lastSkippedSecretAt: Date?
+    private var lastSkippedLarge: (bytes: Int, at: Date)?
 
     private enum SecretMode { case skip, hide, show }
 
@@ -766,9 +789,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
         if types.contains(where: { ignoredTypes.contains($0) }) { return }
 
         // The size is checked before the data is turned into text. The read itself is not limited.
-        guard let data,
-              data.count <= vault.maxBytes,
-              let text = String(data: data, encoding: .utf8),
+        guard let data else { return }
+        if data.count > vault.maxBytes {
+            lastSkippedLarge = (data.count, Date())
+            return
+        }
+        guard let text = String(data: data, encoding: .utf8),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         if secretMode == .skip && SecretDetector.looksLikeSecret(text) {
             lastSkippedSecretAt = Date()
@@ -812,10 +838,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
         menu.addItem(searchItem)
 
         // Controls come next, so they stay in reach however long the history is.
-        let header = disabled("Clipboard History")
-        headerItem = header
-        menu.addItem(header)
-
         let status: String?
         if vault == nil {
             status = vaultError.map { "Encryption key unavailable, retrying: \($0)" }
@@ -826,6 +848,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
         if let message = status { menu.addItem(disabled(message)) }
         if let skipped = lastSkippedSecretAt, Date().timeIntervalSince(skipped) < 120 {
             menu.addItem(disabled("Skipped a copy that looks like a secret (not saved)"))
+        }
+        if let large = lastSkippedLarge, let vault, Date().timeIntervalSince(large.at) < 120 {
+            menu.addItem(disabled(
+                "Skipped a \(byteString(large.bytes)) copy: over the \(byteString(vault.maxBytes)) limit (not saved)"))
+        }
+        if let room = vault?.lastMadeRoom, Date().timeIntervalSince(room.at) < 120 {
+            let what = room.count == 1 ? "1 older entry" : "\(room.count) older entries"
+            menu.addItem(disabled("Dropped \(what) to make room for a large copy"))
         }
         menu.addItem(.separator())
 
@@ -875,6 +905,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         menu.addItem(.separator())
+
+        // The title sits just above the history, with how full it is.
+        let header = disabled("Clipboard History")
+        headerItem = header
+        menu.addItem(header)
 
         // The legend for the … ⏎ •••• marks lives in the Help submenu, not here.
         entriesStart = menu.items.count
@@ -927,13 +962,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
         return result
     }
 
+    private func byteString(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+
+    // The title above the history. It also says how full the history is, by whichever limit is
+    // closer: the number of entries or the total size.
+    private func headerTitle() -> String {
+        let base = paused ? "Capturing paused" : "Clipboard History"
+        guard let vault, !vault.items.isEmpty else { return base }
+        let count = vault.items.count
+        let bytes = vault.totalBytes
+        let countShare = Double(count) / Double(vault.maxItems)
+        let sizeShare = Double(bytes) / Double(vault.maxTotalBytes)
+        let detail = sizeShare > countShare
+            ? "\(byteString(bytes)) of \(byteString(vault.maxTotalBytes))"
+            : "\(count) of \(vault.maxItems)"
+        let share = max(countShare, sizeShare)
+        if share >= 1 { return "\(base) · full, \(detail) (oldest drop as you copy)" }
+        return "\(base) · \(Int(share * 100))% full (\(detail))"
+    }
+
     // Brings the rows that stay open up to date after a click, without closing the menu.
     private func refreshControls() {
         func symbol(_ name: String) -> NSImage? {
             NSImage(systemSymbolName: name, accessibilityDescription: nil)
         }
         let check = symbol("checkmark")
-        headerItem?.title = paused ? "Capturing paused" : "Clipboard History"
+        headerItem?.title = headerTitle()
         pauseRow?.update(title: paused ? "Resume Capturing" : "Pause Capturing", image: nil, enabled: true)
 
         let revealing = isRevealing
@@ -1160,6 +1216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             "Short passwords cannot be recognised. Pause Capturing first.",
             nil,
             "Saved text is encrypted on disk but shown here as plain text",
+            nil,
+            "Limits: 200 entries, 2 MB per copy, 25 MB in all",
+            "When full, the oldest entries are dropped first",
+            "Copies over 2 MB are not saved, and the menu says so",
         ]
         let help = NSMenu()
         for line in lines {
