@@ -12,14 +12,20 @@ Click the ClipLock icon in the menu bar to see what you copied recently, newest 
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="docs/screenshots/menu.png" alt="The ClipLock menu with a search box at the top and the saved entries below. Secrets show only their first characters, with an eye button." width="100%"></td>
-    <td align="center" width="33%"><img src="docs/screenshots/search.png" alt="Typing in the search box filters the list as you type." width="100%"></td>
-    <td align="center" width="33%"><img src="docs/screenshots/reveal.png" alt="Clicking the eye on a hidden entry shows its value." width="100%"></td>
+    <td align="center" width="50%"><img src="docs/screenshots/menu.png" alt="The ClipLock menu with a search box at the top, then the settings, then the Clipboard History title with how full it is, and the saved entries below. Secrets show only their first characters, with an eye button." width="100%"></td>
+    <td align="center" width="50%"><img src="docs/screenshots/search.png" alt="Typing in the search box filters the list as you type and shows how many entries match." width="100%"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Your history, newest first. Secrets are partly hidden.</sub></td>
+    <td align="center"><sub>Your history, newest first, with how full it is. Secrets are partly hidden.</sub></td>
     <td align="center"><sub>Click the search box and type to filter.</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><img src="docs/screenshots/reveal.png" alt="Clicking the eye on a hidden entry shows its value." width="100%"></td>
+    <td align="center" width="50%"><img src="docs/screenshots/capacity.png" alt="A nearly full history (94% full, 47.5 MB of 50 MB) with notices that a 10.5 MB copy was skipped and an older entry was dropped to make room." width="100%"></td>
+  </tr>
+  <tr>
     <td align="center"><sub>The eye shows or hides one entry.</sub></td>
+    <td align="center"><sub>When it is nearly full, the menu says what was skipped or dropped.</sub></td>
   </tr>
 </table>
 

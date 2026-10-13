@@ -723,11 +723,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSSear
             reason: "Watching the clipboard")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        // Use the app icon in the menu bar, falling back to a system symbol if it is missing.
-        let appIcon = NSApp.applicationIconImage.copy() as? NSImage
-        appIcon?.size = NSSize(width: 18, height: 18)
-        statusItem.button?.image = appIcon ?? NSImage(
-            systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipLock")
+        // Use the app icon from the app bundle in the menu bar. If it cannot be loaded, fall back to a
+        // system symbol that adapts to light and dark menu bars (never the blank generic app icon).
+        if let icon = Bundle.main.image(forResource: "AppIcon") {
+            icon.size = NSSize(width: 18, height: 18)
+            statusItem.button?.image = icon
+        } else {
+            let symbol = NSImage(
+                systemSymbolName: "lock.doc", accessibilityDescription: "ClipLock")
+                ?? NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "ClipLock")
+            symbol?.isTemplate = true
+            statusItem.button?.image = symbol
+        }
         statusItem.button?.setAccessibilityLabel("ClipLock")
 
         let menu = NSMenu()
