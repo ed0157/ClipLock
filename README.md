@@ -45,7 +45,7 @@ Click the ClipLock icon in the menu bar to see what you copied recently, newest 
 
   The two settings cannot both be on. Each hidden entry has an **eye** button: click it to show or hide just that entry, right in the menu. **Reveal Hidden Values** at the top shows all hidden entries for 30 seconds. Clicking the entry itself copies the full value.
 - **Launch at Login.** Turn it on from the menu so ClipLock starts when your Mac does.
-- **Built-in Help.** The *Help* submenu explains the `…` and `⏎` marks and what is and is not saved.
+- **Built-in Help.** The *Help* submenu explains the `…` and `⏎` marks and what is and is not saved, and shows which version you have installed.
 - **Pause anytime.** Stop capturing without losing what is already saved.
 - **Light on the system.** It checks the clipboard about twice a second and saves in the background.
 - **Shows how full it is.** The title above the history reads, for example, `Clipboard History · 94% full (187 of 200)`. It shows whichever limit is closer, the number of entries or the total size.
