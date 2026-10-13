@@ -145,4 +145,4 @@ Releases are ad-hoc signed only. Notarizing them needs a paid Apple Developer ac
 
 The source code and documentation are released under the MIT licence. See [LICENSE](LICENSE).
 
-The app icon and the README banner (`Resources/AppIcon.png`, `Resources/AppIcon.icns` and `docs/readme-banner.png`) are © 2026 ed0157, all rights reserved. They are **not** covered by the MIT licence. Please do not reuse them without permission.
+The app icon and the README banner (`Resources/AppIcon.png`, `Resources/AppIcon.icns` and `docs/readme-banner.png`) are © 2026 ed0157, all rights reserved. They are **not** covered by the MIT licence (see [NOTICE.md](NOTICE.md)). Please do not reuse them without permission.
